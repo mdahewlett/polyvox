@@ -17,7 +17,7 @@ app = FastAPI(title="Polyvox API")
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -164,7 +164,11 @@ async def synthesize(user_id: str = Form(...), text: str = Form(...)):
         output_path=str(output_path),
     )
 
-    return {"status": "success", "audio_url": f"/audio/{output_id}_output.wav"}
+    return {
+        "status": "success",
+        "audio_url": f"/audio/{output_id}_output.wav",
+        "original_audio_url": f"/audio/{output_id}_polly.wav",
+    }
 
 
 @app.get("/audio/{filename}")
