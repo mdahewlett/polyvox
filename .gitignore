@@ -28,3 +28,15 @@ out/
 .idea/
 .DS_Store
 *.log
+# Audio files
+*.wav
+*.mp3
+*.m4a
+
+# Model checkpoints
+backend/checkpoints_v2/
+backend/OpenVoice/
+
+# Uploads and outputs
+backend/uploads/
+backend/outputs/
