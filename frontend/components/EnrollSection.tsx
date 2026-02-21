@@ -1,18 +1,13 @@
-"use client";
+'use client';
 
-import { useRef, useState } from "react";
-import { Mic, Upload, Check } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { usePolyvoxStore } from "@/lib/store";
-import { useEnroll } from "@/lib/hooks";
+import { useRef, useState } from 'react';
+import { Mic, Upload, Check } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { usePolyvoxStore } from '@/lib/store';
+import { useEnroll } from '@/lib/hooks';
 
 export function EnrollSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,14 +38,14 @@ export function EnrollSection() {
       recorder.onstop = async () => {
         setIsRecording(false);
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         const userId = getOrCreateUserId();
 
         try {
           await enroll({ userId, audioBlob: blob });
-          toast.success("Voice enrolled successfully!");
+          toast.success('Voice enrolled successfully!');
         } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Enroll failed");
+          toast.error(err instanceof Error ? err.message : 'Enroll failed');
         }
       };
 
@@ -58,7 +53,7 @@ export function EnrollSection() {
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch (err) {
-      toast.error("Could not access microphone");
+      toast.error('Could not access microphone');
     }
   };
 
@@ -67,54 +62,56 @@ export function EnrollSection() {
     if (!file) return;
 
     const userId = getOrCreateUserId();
-    const blob = await file.arrayBuffer().then((b) => new Blob([b], { type: file.type }));
+    const blob = await file
+      .arrayBuffer()
+      .then((b) => new Blob([b], { type: file.type }));
 
     try {
       await enroll({ userId, audioBlob: blob });
-      toast.success("Voice enrolled successfully!");
+      toast.success('Voice enrolled successfully!');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Enroll failed");
+      toast.error(err instanceof Error ? err.message : 'Enroll failed');
     }
 
-    e.target.value = "";
+    e.target.value = '';
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Enroll Your Voice</CardTitle>
-        <div className="flex items-center gap-2">
+        <CardTitle>Record a sample of your voice</CardTitle>
+        <div className='flex items-center gap-2'>
           {isEnrolled && (
-            <Badge variant="secondary" className="gap-1">
-              <Check className="size-3" />
+            <Badge variant='secondary' className='gap-1'>
+              <Check className='size-3' />
               Voice enrolled
             </Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2">
+      <CardContent className='flex flex-col gap-4'>
+        <div className='flex flex-wrap gap-2'>
           <Button
-            variant={isRecording ? "destructive" : "default"}
+            variant={isRecording ? 'destructive' : 'default'}
             onClick={handleRecord}
             disabled={isMutating}
           >
-            <Mic className="size-4" />
-            {isRecording ? "Stop Recording" : "Record Voice Sample"}
+            <Mic className='size-4' />
+            {isRecording ? 'Stop Recording' : 'Record'}
           </Button>
           <Button
-            variant="outline"
+            variant='outline'
             onClick={() => fileInputRef.current?.click()}
             disabled={isMutating}
           >
-            <Upload className="size-4" />
+            <Upload className='size-4' />
             Upload File
           </Button>
           <input
             ref={fileInputRef}
-            type="file"
-            accept=".wav,.mp3,.m4a,.webm,.ogg"
-            className="hidden"
+            type='file'
+            accept='.wav,.mp3,.m4a,.webm,.ogg'
+            className='hidden'
             onChange={handleUpload}
           />
         </div>

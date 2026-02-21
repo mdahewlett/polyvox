@@ -23,8 +23,10 @@ dependencies = [
     "wavmark>=0.0.3",
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.9",
-    "huggingface-hub>=0.20.0",
+    "huggingface-hub>=0.21.0,<1.0",
     "onnxruntime>=1.16.0,<1.20.0",
+    "tokenizers>=0.13,<0.14",
+    "setuptools<82",
 ]
 
 [tool.setuptools]
