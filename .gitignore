@@ -40,3 +40,6 @@ backend/OpenVoice/
 # Uploads and outputs
 backend/uploads/
 backend/outputs/
+
+# Worklog
+worklog.md

@@ -26,8 +26,8 @@ export function useEnroll() {
 export function useSynthesize() {
   const { trigger, data, isMutating, error } = useSWRMutation(
     "synthesize",
-    async (_key, { arg }: { arg: { userId: string; text: string } }) => {
-      return synthesizeApi(arg.userId, arg.text);
+    async (_key, { arg }: { arg: { userId: string; text: string; voiceId: string } }) => {
+      return synthesizeApi(arg.userId, arg.text, arg.voiceId);
     }
   );
 

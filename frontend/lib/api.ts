@@ -1,6 +1,20 @@
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export interface Voice {
+  id: string;
+  name: string;
+  source: string;
+}
+
+export async function getVoices(): Promise<{ voices: Voice[] }> {
+  const res = await fetch(`${API_BASE}/voices`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch voices");
+  }
+  return res.json();
+}
+
 export async function enroll(userId: string, audioBlob: Blob): Promise<{ status: string; user_id: string }> {
   const formData = new FormData();
   formData.append("user_id", userId);
@@ -24,11 +38,13 @@ export async function enroll(userId: string, audioBlob: Blob): Promise<{ status:
 
 export async function synthesize(
   userId: string,
-  text: string
+  text: string,
+  voiceId: string = "Ayanda"
 ): Promise<{ status: string; audio_url: string; original_audio_url: string }> {
   const formData = new FormData();
   formData.append("user_id", userId);
   formData.append("text", text);
+  formData.append("voice_id", voiceId);
 
   const res = await fetch(`${API_BASE}/synthesize`, {
     method: "POST",

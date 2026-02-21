@@ -58,10 +58,52 @@ def get_polly():
 # In-memory store for speaker embeddings
 speaker_embeddings = {}
 
+# Voice registry: Polly neural voices (Phase 1). OpenVoice base speakers in Phase 2.
+POLLY_VOICES = [
+    {"id": "Ayanda", "name": "Ayanda (South African)", "engine": "neural"},
+    {"id": "Nicole", "name": "Nicole (Australian)", "engine": "neural"},
+    {"id": "Olivia", "name": "Olivia (Australian)", "engine": "neural"},
+    {"id": "Russell", "name": "Russell (Australian)", "engine": "neural"},
+    {"id": "Amy", "name": "Amy (British)", "engine": "neural"},
+    {"id": "Emma", "name": "Emma (British)", "engine": "neural"},
+    {"id": "Brian", "name": "Brian (British)", "engine": "neural"},
+    {"id": "Arthur", "name": "Arthur (British)", "engine": "neural"},
+    {"id": "Joanna", "name": "Joanna (US)", "engine": "neural"},
+    {"id": "Matthew", "name": "Matthew (US)", "engine": "neural"},
+    {"id": "Ruth", "name": "Ruth (US)", "engine": "neural"},
+    {"id": "Stephen", "name": "Stephen (US)", "engine": "neural"},
+    {"id": "Danielle", "name": "Danielle (US)", "engine": "neural"},
+    {"id": "Gregory", "name": "Gregory (US)", "engine": "neural"},
+    {"id": "Niamh", "name": "Niamh (Irish)", "engine": "neural"},
+    {"id": "Aria", "name": "Aria (New Zealand)", "engine": "neural"},
+    {"id": "Kajal", "name": "Kajal (Indian)", "engine": "neural"},
+]
+POLLY_VOICE_IDS = {v["id"] for v in POLLY_VOICES}
+
 
 @app.get("/")
 def root():
     return {"status": "ok"}
+
+
+@app.get("/voices")
+async def list_voices():
+    """Return available base voices (Polly + OpenVoice base speakers if present)."""
+    voices = [
+        {"id": v["id"], "name": v["name"], "source": "polly"}
+        for v in POLLY_VOICES
+    ]
+    # Phase 2: scan checkpoints_v2/base_speakers/ses/*.pth if folder exists
+    base_speakers_dir = Path("checkpoints_v2/base_speakers/ses")
+    if base_speakers_dir.exists():
+        for pth in base_speakers_dir.glob("*.pth"):
+            voice_id = pth.stem
+            voices.append({
+                "id": voice_id,
+                "name": voice_id.replace("-", " ").title(),
+                "source": "openvoice",
+            })
+    return {"voices": voices}
 
 
 @app.post("/enroll")
@@ -114,21 +156,54 @@ async def enroll(user_id: str = Form(...), audio: UploadFile = File(...)):
     return {"status": "enrolled", "user_id": user_id}
 
 
+# Default voice sample for unenrolled users (optional). If present, used as target.
+SAMPLES_DIR = Path("samples")
+DEFAULT_VOICE_PATH = SAMPLES_DIR / "default_voice.wav"
+default_speaker_embedding = None
+
+
+def get_default_speaker_embedding():
+    """Load default voice embedding from samples/default_voice.wav if it exists."""
+    global default_speaker_embedding
+    if default_speaker_embedding is not None:
+        return default_speaker_embedding
+    if DEFAULT_VOICE_PATH.exists():
+        conv = get_converter()
+        default_speaker_embedding = conv.extract_se(str(DEFAULT_VOICE_PATH))
+    return default_speaker_embedding
+
+
 @app.post("/synthesize")
-async def synthesize(user_id: str = Form(...), text: str = Form(...)):
-    """Generate SA-accented speech in user's voice."""
-    if user_id not in speaker_embeddings:
+async def synthesize(
+    user_id: str = Form(...),
+    text: str = Form(...),
+    voice_id: str = Form("Ayanda"),
+):
+    """Generate speech. Uses user's voice if enrolled, else default voice or raw Polly."""
+    # Validate voice_id against allowed Polly voices (Phase 1)
+    if voice_id not in POLLY_VOICE_IDS:
         raise HTTPException(
-            status_code=404, detail="User not enrolled. Call /enroll first."
+            status_code=400,
+            detail=f"Invalid voice_id. Must be one of: {sorted(POLLY_VOICE_IDS)}",
         )
 
-    target_se = speaker_embeddings[user_id]
+    # Resolve target: enrolled user > default sample > None (skip conversion)
+    target_se = None
+    if user_id in speaker_embeddings:
+        target_se = speaker_embeddings[user_id]
+    else:
+        target_se = get_default_speaker_embedding()
+
     output_id = str(uuid.uuid4())[:8]
 
-    # 1. Generate SA accent with Polly
+    # Resolve engine for this voice
+    voice_info = next((v for v in POLLY_VOICES if v["id"] == voice_id), None)
+    engine = voice_info["engine"] if voice_info else "neural"
+
+    # 1. Generate base audio with Polly
     polly_client = get_polly()
     response = polly_client.synthesize_speech(
-        Text=text, OutputFormat="mp3", VoiceId="Ayanda", Engine="neural"
+        Text=text, OutputFormat="mp3", VoiceId=voice_id, Engine=engine
     )
 
     polly_mp3 = OUTPUT_DIR / f"{output_id}_polly.mp3"
@@ -152,23 +227,29 @@ async def synthesize(user_id: str = Form(...), text: str = Form(...)):
         capture_output=True,
     )
 
-    # 2. Extract Polly SE and convert
-    conv = get_converter()
-    source_se = conv.extract_se(str(polly_wav))
-
-    output_path = OUTPUT_DIR / f"{output_id}_output.wav"
-    conv.convert(
-        audio_src_path=str(polly_wav),
-        src_se=source_se,
-        tgt_se=target_se,
-        output_path=str(output_path),
-    )
-
-    return {
-        "status": "success",
-        "audio_url": f"/audio/{output_id}_output.wav",
-        "original_audio_url": f"/audio/{output_id}_polly.wav",
-    }
+    # 2. Convert to target voice if we have one, else use Polly output as-is
+    if target_se is not None:
+        conv = get_converter()
+        source_se = conv.extract_se(str(polly_wav))
+        output_path = OUTPUT_DIR / f"{output_id}_output.wav"
+        conv.convert(
+            audio_src_path=str(polly_wav),
+            src_se=source_se,
+            tgt_se=target_se,
+            output_path=str(output_path),
+        )
+        return {
+            "status": "success",
+            "audio_url": f"/audio/{output_id}_output.wav",
+            "original_audio_url": f"/audio/{output_id}_polly.wav",
+        }
+    else:
+        # No enrollment, no default sample: return Polly output directly
+        return {
+            "status": "success",
+            "audio_url": f"/audio/{output_id}_polly.wav",
+            "original_audio_url": f"/audio/{output_id}_polly.wav",
+        }
 
 
 @app.get("/audio/{filename}")
